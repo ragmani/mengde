@@ -3,15 +3,14 @@
 namespace mengde {
 namespace core {
 
-HeroTemplate::HeroTemplate(const string& id, const string& bitmap_path, const UnitClass* unit_class,
-                           const Attribute& hero_stat)
-    : id_(id), bitmap_path_(bitmap_path), unit_class_(unit_class), hero_attr_(hero_stat) {}
+HeroTemplate::HeroTemplate(const string& id, const HeroClass* hero_class, const Attribute& hero_stat)
+    : id_(id), hero_class_(hero_class), hero_attr_(hero_stat) {}
 
-int HeroTemplate::GetClassIndex() const { return unit_class_->GetIndex(); }
+int HeroTemplate::class_index() const { return hero_class_->index(); }
 
-int HeroTemplate::GetMove() const { return unit_class_->GetMove(); }
+int HeroTemplate::move() const { return hero_class_->move(); }
 
-const AttackRange& HeroTemplate::GetAttackRange() const { return unit_class_->GetAttackRange(); }
+const AttackRange& HeroTemplate::attack_range() const { return hero_class_->attack_range(); }
 
 }  // namespace core
 }  // namespace mengde

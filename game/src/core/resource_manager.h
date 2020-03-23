@@ -4,10 +4,10 @@
 #include <unordered_map>
 
 #include "equipment.h"
-#include "hero.h"
+#include "hero_class.h"
+#include "hero_template.h"
 #include "magic.h"
 #include "terrain.h"
-#include "unit_class.h"
 #include "util/common.h"
 
 namespace mengde {
@@ -32,7 +32,9 @@ class ResourceManager {
     container_[id] = e;
   }
 
-  T* Get(const string& id) {
+  T* Get(const string& id) { return const_cast<T*>(static_cast<const ResourceManager*>(this)->Get(id)); }
+
+  const T* Get(const string& id) const {
     auto iter = container_.find(id);
     if (iter != container_.end()) {
       return iter->second;
@@ -51,25 +53,31 @@ class ResourceManager {
     }
   }
 
+  void ForEach(const function<void(const string&, const T&)>& f) const {
+    for (const auto& e : container_) {
+      f(e.first, *e.second);
+    }
+  }
+
  private:
   std::unordered_map<string, T*> container_;
 };
 
-typedef ResourceManager<Magic> MagicManager;
-typedef ResourceManager<Equipment> EquipmentManager;
-typedef ResourceManager<UnitClass> UnitClassManager;
-typedef ResourceManager<Terrain> TerrainManager;
-typedef ResourceManager<HeroTemplate> HeroTemplateManager;
+using MagicManager = ResourceManager<Magic>;
+using EquipmentManager = ResourceManager<Equipment>;
+using HeroClassManager = ResourceManager<HeroClass>;
+using TerrainManager = ResourceManager<Terrain>;
+using HeroTemplateManager = ResourceManager<HeroTemplate>;
 
 struct ResourceManagers {
-  UnitClassManager* unit_class_manager;
+  HeroClassManager* hero_class_manager;
   TerrainManager* terrain_manager;
   MagicManager* magic_manager;
   EquipmentManager* equipment_manager;
   HeroTemplateManager* hero_tpl_manager;
 
   ResourceManagers()
-      : unit_class_manager(nullptr),
+      : hero_class_manager(nullptr),
         terrain_manager(nullptr),
         magic_manager(nullptr),
         equipment_manager(nullptr),

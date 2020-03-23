@@ -6,61 +6,68 @@
 namespace mengde {
 namespace core {
 
-Hero::Hero(const HeroTemplate* hero_tpl, uint16_t level)
-    : hero_tpl_(hero_tpl),
-      equipment_set_(new EquipmentSet(this)),
-      level_(level, 0),
-      hero_attr_(hero_tpl->GetHeroStat()),
-      unit_attr_(),
-      unit_pure_attr_(),
-      hpmp_() {
+Hero::Hero(const HeroTemplate* hero_tpl, Level level)
+    : hero_tpl_{hero_tpl},
+      hero_class_{hero_tpl_->hero_class()},
+      equipment_set_{new EquipmentSet{this}},
+      level_{level},
+      hero_attr_{hero_tpl->GetHeroStat()},
+      unit_attr_{},
+      unit_pure_attr_{},
+      hpmp_{} {
+  ASSERT(hero_class_ != nullptr);
+  // TODO Handle promotion chain
   UpdateStat();
 }
 
 Hero::Hero(const Hero& hero)
     : hero_tpl_(hero.hero_tpl_),
-      equipment_set_(hero.GetEquipmentSet()->Clone(this)),
+      hero_class_{hero.hero_class()},
+      equipment_set_{new EquipmentSet{this}},
       level_(hero.level_),
       hero_attr_(hero.hero_attr_),
       unit_attr_(hero.unit_attr_),
       unit_pure_attr_(hero.unit_pure_attr_),
-      hpmp_(hero.hpmp_) {}
+      hpmp_(hero.hpmp_) {
+  ASSERT(hero_class_ != nullptr);
+}
 
-Hero::~Hero() { delete equipment_set_; }
+Hero::~Hero() {}
 
-string Hero::GetId() const { return hero_tpl_->GetId(); }
+string Hero::id() const { return hero_tpl_->id(); }
 
-string Hero::GetModelId() const { return hero_tpl_->GetModelId(); }
+int Hero::class_index() const { return hero_class_->index(); }
 
-const UnitClass* Hero::GetClass() const { return hero_tpl_->GetClass(); }
+int Hero::move() const { return hero_class_->move(); }
 
-int Hero::GetClassIndex() const { return hero_tpl_->GetClassIndex(); }
-
-int Hero::GetMove() const { return hero_tpl_->GetMove(); }
-
-const AttackRange& Hero::GetAttackRange() const { return hero_tpl_->GetAttackRange(); }
+const AttackRange& Hero::attack_range() const { return hero_class_->attack_range(); }
 
 const Attribute& Hero::GetHeroStatBase() const { return hero_tpl_->GetHeroStat(); }
 
 void Hero::LevelUp() {
+  ASSERT(IsExpFull());
+  ASSERT(level_.exp >= Level::kExpLimit);
+
+  level_.exp -= Level::kExpLimit;
   level_.level++;
+
   UpdateStat();
 }
 
 void Hero::PutOn(const Equipment* equipment) { equipment_set_->SetEquipment(equipment); }
 
 HpMp Hero::CalcHpMp() const {
-  HpMp xtat;
-#define UPDATE_HPMP(x, xc) xtat.x = GetClass()->GetBni##xc().base + GetClass()->GetBni##xc().incr * level_.level
-  UPDATE_HPMP(hp, Hp);
-  UPDATE_HPMP(mp, Mp);
+  HpMp hpmp;
+#define UPDATE_HPMP(x) hpmp.x = hero_class()->bni_##x().base + hero_class()->bni_##x().incr * level_.level
+  UPDATE_HPMP(hp);
+  UPDATE_HPMP(mp);
 #undef UPDATE_HPMP
-  return xtat;
+  return hpmp;
 }
 
 Attribute Hero::CalcUnitPureAttr() const {
   Attribute unit_stat =
-      ((hero_attr_ / 2) + ((100 + 10 * (GetClass()->GetStatGrade() - 1)) * level_.level * hero_attr_) / 2000);
+      ((hero_attr_ / 2) + ((100 + 10 * (hero_class()->stat_grade() - 1)) * level_.level * hero_attr_) / 2000);
   return unit_stat;
 }
 
@@ -74,6 +81,25 @@ void Hero::UpdateStat() {
 
     unit_attr_.ApplyModifier(multipliers, addends);
   }
+}
+
+bool Hero::ReadyPromotion() const {
+  auto promotion_info = hero_class_->promotion_info();
+  if (promotion_info) {
+    return GetLevel() >= promotion_info->level;
+  }
+  return false;
+}
+
+void Hero::Promote(const HeroClassManager* hcm) {
+  ASSERT(ReadyPromotion());
+
+  auto promotion_info = hero_class_->promotion_info();
+  auto hero_class_id = promotion_info->id;
+  hero_class_ = hcm->Get(hero_class_id);
+  ASSERT(hero_class_ != nullptr);
+
+  UpdateStat();
 }
 
 }  // namespace core

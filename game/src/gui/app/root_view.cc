@@ -2,8 +2,8 @@
 
 #include "app.h"
 #include "control_view.h"
-#include "core/game.h"
 #include "core/scenario.h"
+#include "core/stage.h"
 #include "deploy_view.h"
 #include "game_view.h"
 #include "gui/uifw/drawer.h"
@@ -17,9 +17,9 @@ namespace app {
 
 RootView::RootView(const Rect& frame, core::Scenario* scenario, App* app)
     : View(frame), app_(app), game_view_(nullptr), ui_views_(nullptr) {
-  game_view_ = new GameView(frame, scenario->GetGame(), app_);
+  game_view_ = new GameView(frame, scenario->current_stage()->user_interface(), app_);
 
-  ui_views_ = new UIViews(frame, scenario, game_view_);
+  ui_views_ = new UIViews(frame, scenario, game_view_, app->GetCurrentScenarioPath());
   ui_views_->SetTransparent();
 
   game_view_->SetUIViews(ui_views_);
@@ -28,8 +28,8 @@ RootView::RootView(const Rect& frame, core::Scenario* scenario, App* app)
 RootView::~RootView() {
   // FIXME ui_view_ is deleted first then StateMachine destructs and it could do something with ui_views_ then
   //       we are doomed.
-  delete ui_views_;
   delete game_view_;
+  delete ui_views_;
 }
 
 void RootView::Update() {
@@ -56,6 +56,13 @@ bool RootView::OnMouseMotionEvent(const foundation::MouseMotionEvent& e) {
 bool RootView::OnMouseWheelEvent(const foundation::MouseWheelEvent& e) {
   if (ui_views_->DelegateMouseWheelEvent(e)) return true;
   if (game_view_->OnMouseWheelEvent(e)) return true;
+
+  return true;
+}
+
+bool RootView::OnKeyEvent(const foundation::KeyEvent& e) {
+  if (ui_views_->DelegateKeyEvent(e)) return true;
+  if (game_view_->OnKeyEvent(e)) return true;
 
   return true;
 }

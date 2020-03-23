@@ -4,14 +4,15 @@
 
 #include "cell.h"
 #include "core/path_tree.h"
+#include "hero_class.h"
 #include "unit.h"
-#include "unit_class.h"
 #include "util/common.h"
 
 namespace mengde {
 namespace core {
 
-Map::Map(const vector<string>& input, const string& bitmap_path, TerrainManager* tm) : bitmap_path_(bitmap_path) {
+Map::Map(const UserInterface* ui, const vector<string>& input, const string& bitmap_path, TerrainManager* tm)
+    : ui_(ui), bitmap_path_(bitmap_path) {
   int rows = input.size();
   int cols = input[0].size();
   size_ = {cols, rows};
@@ -37,19 +38,19 @@ Map::~Map() {
 
 string Map::GetModelId() { return bitmap_path_; }
 
-Cell* Map::GetCell(int c, int r) {
+const Cell* Map::GetCell(int c, int r) const {
   ASSERT(IsValidCoords({c, r}));
   return grid_[r][c];
 }
 
-Cell* Map::GetCell(Vec2D v) {
+const Cell* Map::GetCell(Vec2D v) const {
   ASSERT(IsValidCoords(v));
   return grid_[v.y][v.x];
 }
 
 bool Map::UnitInCell(Vec2D c) const { return IsValidCoords(c) && grid_[c.y][c.x]->IsUnitPlaced(); }
 
-const Unit* Map::GetUnit(Vec2D c) const {
+UId Map::GetUnitId(Vec2D c) const {
   ASSERT(UnitInCell(c));
   return grid_[c.y][c.x]->GetUnit();
 }
@@ -64,23 +65,30 @@ Terrain* Map::GetTerrain(Vec2D c) {
   return grid_[c.y][c.x]->GetTerrain();
 }
 
+const Terrain* Map::GetTerrain(Vec2D c) const {
+  ASSERT(IsValidCoords(c));
+  return grid_[c.y][c.x]->GetTerrain();
+}
+
 // Using Dijkstra Shortest Path Algorithm
 // ( O(N^2) where N is number of vertices )
-PathTree* Map::FindPath(const Unit* unit, Vec2D dest) {
+PathTree* Map::FindPath(const UId& uid, Vec2D dest) {
   static const int kDNum = 4;
   static const int kDRow[] = {0, 0, -1, 1};
   static const int kDCol[] = {-1, 1, 0, 0};
   const int N = size_.x * size_.y;
   const int kInf = 1 << 30;
 
+  const Unit* unit = ui_->GetUnit(uid);
+
   vector<int> dist(N, kInf);
   vector<bool> used(N, false);
   vector<PathNode*> from(N, NULL);
-  Vec2D coords = unit->GetPosition();
+  Vec2D coords = unit->position();
   int sc = SerializeVec2D(coords);
   int stat_move = kInf;
   if (dest == Vec2D(-1, -1)) {
-    stat_move = unit->GetMove();
+    stat_move = unit->move();
   }
   dist[sc] = 0;
 
@@ -103,7 +111,10 @@ PathTree* Map::FindPath(const Unit* unit, Vec2D dest) {
 
     Vec2D vec_current = DeserializeVec2D(current);
     used[current] = true;
-    if (dist[current] <= stat_move && !IsHostilePlaced(unit, vec_current)) {
+
+    if (IsHostilePlaced(uid, vec_current)) continue;
+
+    if (dist[current] <= stat_move) {
       if (pathtree == nullptr) {
         pathtree = new PathTree(vec_current);
         from[current] = pathtree->GetRoot();
@@ -123,10 +134,10 @@ PathTree* Map::FindPath(const Unit* unit, Vec2D dest) {
       Vec2D nvec(nc, nr);
       if (!IsValidCoords(nvec)) continue;
       int next = SerializeVec2D(nvec);
-      int new_dist = dist[current] + grid_[nr][nc]->GetMoveCost(unit->GetClassIndex());
+      int new_dist = dist[current] + grid_[nr][nc]->GetMoveCost(unit->class_index());
 
       // handle ZOC
-      if (new_dist < stat_move && IsHostileAdjacent(unit, nvec) && nvec != dest) {
+      if (new_dist < stat_move && IsHostileAdjacent(uid, nvec) && nvec != dest) {
         new_dist = stat_move;
       }
 
@@ -140,48 +151,52 @@ PathTree* Map::FindPath(const Unit* unit, Vec2D dest) {
   return pathtree;
 }
 
-PathTree* Map::FindMovablePath(const Unit* unit) { return FindPath(unit, {-1, -1}); }
+PathTree* Map::FindMovablePath(const UId& uid) { return FindPath(uid, {-1, -1}); }
 
-vector<Vec2D> Map::FindPathTo(const Unit* unit, Vec2D dest) {
-  unique_ptr<PathTree> pathtree(FindPath(unit, dest));
+vector<Vec2D> Map::FindPathTo(const UId& uid, Vec2D dest) {
+  unique_ptr<PathTree> pathtree(FindPath(uid, dest));
   vector<Vec2D> path = pathtree->GetPathToRoot(dest);
   return path;
 }
 
-void Map::PlaceUnit(const Unit* unit, Vec2D c) {
+void Map::PlaceUnit(const UId& uid, Vec2D c) {
   ASSERT(IsValidCoords(c));
   ASSERT(!grid_[c.y][c.x]->IsUnitPlaced());
-  grid_[c.y][c.x]->SetUnit(unit);
+  grid_[c.y][c.x]->SetUnit(uid);
 }
 
 void Map::MoveUnit(Vec2D src, Vec2D dst) {
-  const Unit* unit = GetUnit(src);
+  auto uid = GetUnitId(src);
   EmptyCell(src);
-  PlaceUnit(unit, dst);
+  PlaceUnit(uid, dst);
 }
 
 void Map::EmptyCell(Vec2D c) { grid_[c.y][c.x]->Empty(); }
 
-bool Map::IsHostileAdjacent(const Unit* unit, Vec2D coords) const {
+bool Map::IsHostileAdjacent(const UId& uid, Vec2D coords) const {
   static const int kDNum = 5;
   static const int kDRow[] = {0, 0, 0, -1, 1};
   static const int kDCol[] = {0, -1, 1, 0, 0};
+
+  const Unit* unit = ui_->GetUnit(uid);
   for (int i = 0; i < kDNum; i++) {
     int nr = coords.y + kDRow[i];
     int nc = coords.x + kDCol[i];
     if (!IsValidCoords({nc, nr})) continue;
     Vec2D ncoords(nc, nr);
     if (UnitInCell(ncoords)) {
-      if (unit->IsHostile(GetUnit(ncoords))) return true;
+      if (unit->IsHostile(ui_->GetUnit(ncoords))) return true;
     }
   }
   return false;
 }
 
-bool Map::IsHostilePlaced(const Unit* unit, Vec2D coords) const {
+bool Map::IsHostilePlaced(const UId& uid, Vec2D coords) const {
   Cell* cell = grid_[coords.y][coords.x];
   ASSERT(cell != nullptr);
-  if (cell->IsUnitPlaced() && unit->IsHostile(cell->GetUnit())) {
+  auto unit = ui_->GetUnit(uid);
+  auto unit_in_cell = cell->GetUnit();
+  if (unit_in_cell && unit->IsHostile(ui_->GetUnit(unit_in_cell))) {
     return true;
   }
   return false;
@@ -189,9 +204,9 @@ bool Map::IsHostilePlaced(const Unit* unit, Vec2D coords) const {
 
 bool Map::IsValidCoords(Vec2D c) const { return c.x >= 0 && c.x < size_.x && c.y >= 0 && c.y < size_.y; }
 
-int Map::ApplyTerrainEffect(const Unit* unit, int value) {
-  Vec2D v = unit->GetPosition();
-  return grid_[v.y][v.x]->ApplyTerrainEffect(unit->GetClassIndex(), value);
+int Map::ApplyTerrainEffect(const Unit* unit, int value) const {
+  Vec2D v = unit->position();
+  return grid_[v.y][v.x]->ApplyTerrainEffect(unit->class_index(), value);
 }
 
 }  // namespace core

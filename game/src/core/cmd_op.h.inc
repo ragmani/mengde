@@ -3,12 +3,13 @@
 #endif
 
 //           enum name
-MACRO_CMD_OP(Invalid    )
+
+// Non-unit Cmds
 MACRO_CMD_OP(Queue      )
 MACRO_CMD_OP(PlayAI     )
 MACRO_CMD_OP(GameVictory)
 
-// Unit related
+// Unit related Cmds
 MACRO_CMD_OP(Action     )
 MACRO_CMD_OP(Move       )
 MACRO_CMD_OP(BasicAttack)
@@ -22,6 +23,9 @@ MACRO_CMD_OP(Speak      )
 MACRO_CMD_OP(GameEnd    )
 MACRO_CMD_OP(RestoreHp  )
 MACRO_CMD_OP(EndAction  )
+MACRO_CMD_OP(GainExp    )
+MACRO_CMD_OP(LevelUp    )
+MACRO_CMD_OP(Promote    )
 
 #undef MACRO_CMD_OP
 

@@ -1,8 +1,8 @@
 #ifndef MENGDE_CORE_HERO_TEMPLATE_H_
 #define MENGDE_CORE_HERO_TEMPLATE_H_
 
+#include "hero_class.h"
 #include "stat.h"
-#include "unit_class.h"
 #include "util/common.h"
 
 namespace mengde {
@@ -10,19 +10,17 @@ namespace core {
 
 class HeroTemplate {
  public:
-  HeroTemplate(const string&, const string&, const UnitClass*, const Attribute&);
-  string GetId() const { return id_; }
-  string GetModelId() const { return bitmap_path_; }
-  const UnitClass* GetClass() const { return unit_class_; }
-  int GetClassIndex() const;
-  int GetMove() const;
+  HeroTemplate(const string& id, const HeroClass* hero_class, const Attribute& hero_attr);
+  string id() const { return id_; }
+  const HeroClass* hero_class() const { return hero_class_; }
+  int class_index() const;
+  int move() const;
   const Attribute& GetHeroStat() const { return hero_attr_; }
-  const AttackRange& GetAttackRange() const;
+  const AttackRange& attack_range() const;
 
  private:
   string id_;
-  string bitmap_path_;
-  const UnitClass* unit_class_;
+  const HeroClass* hero_class_;
   Attribute hero_attr_;
 };
 

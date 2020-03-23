@@ -7,6 +7,7 @@
 #include "core/force.h"
 #include "core/hero.h"
 #include "core/i_deploy_helper.h"
+#include "core/serializer.h"
 #include "core/unit.h"
 #include "deploy_director.h"
 #include "equipment_select_view.h"
@@ -15,6 +16,7 @@
 #include "gui/uifw/button_view.h"
 #include "gui/uifw/image_view.h"
 #include "gui/uifw/text_view.h"
+#include "model_finder.h"
 #include "resource_path.h"
 #include "unit_over_view.h"
 #include "unit_view.h"
@@ -23,23 +25,25 @@ namespace mengde {
 namespace gui {
 namespace app {
 
-HeroModelView::HeroModelView(const Rect& frame, const core::Hero* hero, core::IDeployHelper* deploy_helper)
+HeroModelView::HeroModelView(const Rect& frame, const core::Hero* hero, core::IDeployHelper* deploy_helper,
+                             const Path& base_path)
     : CallbackView(frame), hero_(hero), deploy_no_(0), required_unselectable_(false), tv_no_(nullptr) {
   padding(4);
   Rect img_src_rect(0, 0, 48, 48);
-  Rect iv_frame = LayoutHelper::CalcPosition(GetActualFrameSize(), img_src_rect.GetSize(), LayoutHelper::kAlignCenter);
-  iv_frame.SetY(iv_frame.GetY() - 8);
-  ImageView* iv_hero = new ImageView(iv_frame, rcpath::UnitModelPath(hero->GetModelId(), kSpriteStand).ToString());
+  Rect iv_frame = LayoutHelper::CalcPosition(GetActualFrameSize(), img_src_rect.size(), LayoutHelper::kAlignCenter);
+  iv_frame.y(iv_frame.y() - 8);
+  string model_id = FindModelId(base_path, hero->hero_class()->id(), hero->id(), core::Force::kOwn);
+  ImageView* iv_hero = new ImageView(iv_frame, rcpath::UnitModelPath(model_id, kSpriteStand).ToString());
   iv_hero->SetSourceRect(img_src_rect);
   AddChild(iv_hero);
 
   Rect tv_hero_frame = GetActualFrame();
-  TextView* tv_hero = new TextView(&tv_hero_frame, hero_->GetId(), COLOR("white"), 14, LayoutHelper::kAlignMidBot);
+  TextView* tv_hero = new TextView(tv_hero_frame, hero_->id(), COLOR("white"), 14, LayoutHelper::kAlignMidBot);
   AddChild(tv_hero);
 
   Rect tv_no_frame = GetActualFrame();
-  tv_no_frame.SetW(tv_no_frame.GetW() - 8);
-  tv_no_ = new TextView(&tv_no_frame, "", COLOR("orange"), 20, LayoutHelper::kAlignRgtTop);
+  tv_no_frame.w(tv_no_frame.w() - 8);
+  tv_no_ = new TextView(tv_no_frame, "", COLOR("orange"), 20, LayoutHelper::kAlignRgtTop);
   AddChild(tv_no_);
 
   deploy_no_ = deploy_helper->FindDeploy(hero);
@@ -62,13 +66,14 @@ void HeroModelView::UpdateViews() {
 }
 
 HeroModelListView::HeroModelListView(const Rect& frame, const vector<const core::Hero*>& hero_list,
-                                     core::IDeployHelper* deploy_helper, DeployDirector* director)
+                                     core::IDeployHelper* deploy_helper, DeployDirector* director,
+                                     const Path& base_path)
     : CompositeView(frame) {
   bg_color(COLOR("navy"));
   static const Vec2D kHeroModelSize = {96, 80};
   Rect hero_model_frame({0, 0}, kHeroModelSize);
   for (auto hero : hero_list) {
-    HeroModelView* model_view = new HeroModelView(hero_model_frame, hero, deploy_helper);
+    HeroModelView* model_view = new HeroModelView(hero_model_frame, hero, deploy_helper, base_path);
     model_view->SetMouseButtonHandler(
         [model_view, hero, deploy_helper, director](const foundation::MouseButtonEvent& e) -> bool {
           if (e.IsLeftButtonUp()) {
@@ -84,16 +89,17 @@ HeroModelListView::HeroModelListView(const Rect& frame, const vector<const core:
           return true;
         });
     AddChild(model_view);
-    hero_model_frame.SetX(hero_model_frame.GetX() + kHeroModelSize.x);
-    if (hero_model_frame.GetRight() > GetActualFrameSize().x) {
-      hero_model_frame.SetX(0);
-      hero_model_frame.SetY(hero_model_frame.GetY() + kHeroModelSize.y);
+    hero_model_frame.x(hero_model_frame.x() + kHeroModelSize.x);
+    if (hero_model_frame.right() > GetActualFrameSize().x) {
+      hero_model_frame.x(0);
+      hero_model_frame.y(hero_model_frame.y() + kHeroModelSize.y);
     }
   }
 }
 
-DeployView::DeployView(const Rect& frame, core::Assets* assets, core::IDeployHelper* deploy_helper, GameView* gv)
-    : CompositeView(frame), gv_(gv) {
+DeployView::DeployView(const Rect& frame, const core::Scenario* sce, core::Assets* assets,
+                       core::IDeployHelper* deploy_helper, GameView* gv, const Path& base_path)
+    : CompositeView(frame), sce_{sce}, gv_(gv) {
   padding(8);
   bg_color(COLOR("darkgray"));
 
@@ -107,8 +113,8 @@ DeployView::DeployView(const Rect& frame, core::Assets* assets, core::IDeployHel
   EquipmentSetView* equipment_set_view = unit_view->equipment_set_view();
 
   Rect equipment_select_frame = GetActualFrame();
-  equipment_select_frame.SetW(4 * 96);
-  equipment_select_view_ = new EquipmentSelectView(equipment_select_frame, equipment_set_view);
+  equipment_select_frame.w(4 * 96);
+  equipment_select_view_ = new EquipmentSelectView(equipment_select_frame, gv, equipment_set_view);
   equipment_select_view_->visible(false);
 
   {  // Initialize equipment_set_view
@@ -140,8 +146,9 @@ DeployView::DeployView(const Rect& frame, core::Assets* assets, core::IDeployHel
   HeroModelListView* hero_model_list_view;
   {
     Rect hero_model_list_frame = GetActualFrame();
-    hero_model_list_frame.SetW(4 * 96);
-    hero_model_list_view = new HeroModelListView(hero_model_list_frame, assets->GetHeroes(), deploy_helper, director_);
+    hero_model_list_frame.w(4 * 96);
+    hero_model_list_view =
+        new HeroModelListView(hero_model_list_frame, assets->GetHeroes(), deploy_helper, director_, base_path);
     AddChild(hero_model_list_view);
   }
 
@@ -157,10 +164,24 @@ DeployView::DeployView(const Rect& frame, core::Assets* assets, core::IDeployHel
     return true;
   });
 
+  // Insert Save button here
+  btn_ok_frame.Move(-108, 0);
+  ButtonView* btn_save = new ButtonView(&btn_ok_frame, "Save");
+  btn_save->SetMouseButtonHandler([this](const foundation::MouseButtonEvent& e) {
+    if (e.IsLeftButtonUp()) {
+      core::Serializer save{Path{"save.mengde"}};
+      save.Serialize(*sce_);
+      LOG_INFO("File saved");
+      return true;
+    }
+    return true;
+  });
+
   AddChild(equipment_select_view_);
   AddChild(btn_ok);
+  AddChild(btn_save);
 
-  director_->Init(hero_model_list_view, unit_view->unit_over_view(), equipment_set_view, equipment_select_view_);
+  director_->Init(hero_model_list_view, unit_view, equipment_select_view_);
 }
 
 }  // namespace app

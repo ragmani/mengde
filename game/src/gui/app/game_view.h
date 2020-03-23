@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "common.h"
+#include "core/id.h"
 #include "gui/uifw/view.h"
 #include "state_ui.h"
 #include "ui_views.h"  // FIXME Temporary include
@@ -13,7 +14,7 @@ namespace mengde {
 namespace core {
 
 class Assets;
-class Game;
+class Stage;
 class Scenario;
 class UserInterface;
 struct HpMp;
@@ -35,6 +36,7 @@ class MagicListView;
 class TerrainInfoView;
 class UnitListView;
 class UnitActionView;
+class ItemDetailView;
 
 class UIViews;
 
@@ -43,7 +45,7 @@ class GameView : public View {
   typedef function<void()> NextFrameCallback;
 
  public:
-  GameView(const Rect& frame, core::Game* game, App* app);
+  GameView(const Rect& frame, core::UserInterface* gi, App* app);
   ~GameView();
 
  public:
@@ -53,6 +55,7 @@ class GameView : public View {
   virtual bool OnMouseButtonEvent(const foundation::MouseButtonEvent&) override;
   virtual bool OnMouseMotionEvent(const foundation::MouseMotionEvent&) override;
   virtual bool OnMouseWheelEvent(const foundation::MouseWheelEvent&) override;
+  virtual bool OnKeyEvent(const foundation::KeyEvent&) override;
 
  public:
   // UIStateMachine related
@@ -73,6 +76,7 @@ class GameView : public View {
   void CenterCamera(Vec2D);
 
  public:
+  DeployView* deploy_view() { return ui_views_->deploy_view(); }
   TerrainInfoView* terrain_info_view() { return ui_views_->terrain_info_view(); }
   UnitListView* unit_list_view() { return ui_views_->unit_list_view(); }
   UnitDialogView* unit_dialog_view() { return ui_views_->unit_dialog_view(); }
@@ -83,6 +87,7 @@ class GameView : public View {
   ModalDialogView* dialog_view() { return ui_views_->dialog_view(); }
   MagicListView* magic_list_view() { return ui_views_->magic_list_view(); }
   UnitActionView* unit_action_view() { return ui_views_->unit_action_view(); }
+  ItemDetailView* item_detail_tooltip_view() { return ui_views_->item_detail_tooltip_view(); }
 
  public:
   Vec2D GetMouseCoords() { return mouse_coords_; }
@@ -90,24 +95,26 @@ class GameView : public View {
   void NextFrame(NextFrameCallback);
   void SetUIViews(UIViews* ui_views) { ui_views_ = ui_views; }
   void RaiseMouseOverEvent();
-  void SetSkipRender(uint32_t id, bool b);
+  void SetSkipRender(const core::UId& id, bool b);
   void RenderUnit(Drawer* drawer, const core::Unit* unit, Vec2D pos);
+  string GetModelId(const core::UId& uid);
+  void UpdateModelId(const core::UId& uid);
 
  private:
   void RunCallbacks();
   int GetCurrentSpriteNo(int, int) const;
-  bool SkipRender(uint32_t id) const;
+  bool SkipRender(const core::UId& id) const;
 
  private:
-  core::Game* game_;  // TODO We should eventually remove this, use core::UserInterface instead.
   core::UserInterface* gi_;
 
   App* app_;
 
+  std::unordered_set<uint32_t> skip_render_;
+  std::unordered_map<uint32_t, string> model_ids_;
+
   StateMachine<StateUI*> ui_state_machine_;
   queue<NextFrameCallback> frame_callbacks_;
-
-  std::unordered_set<uint32_t> skip_render_;
 
   Vec2D mouse_coords_;
   Vec2D camera_coords_;

@@ -16,7 +16,7 @@ ScenarioSelectView::ScenarioSelectView(const Rect& frame, App* app) : VerticalLi
 
   // Add header text
   const Rect header_frame({0, 0}, {GetActualFrameSize().x, 32});
-  TextView* header = new TextView(&header_frame, "Choose Scenario", COLOR("yellow"), 16, LayoutHelper::kAlignCenter);
+  TextView* header = new TextView(header_frame, "Choose Scenario", COLOR("yellow"), 16, LayoutHelper::kAlignCenter);
   AddElement(header);
 
   // Add scenario entries
@@ -31,6 +31,7 @@ ScenarioSelectView::ScenarioSelectView(const Rect& frame, App* app) : VerticalLi
         ButtonView* btn_element = new ButtonView(Rect({0, 0}, btn_size), scenario_id);
         btn_element->SetMouseButtonHandler([=](const MouseButtonEvent& e) {
           if (e.IsLeftButtonDown()) {
+            visible(false);
             app->StartNewScenario(scenario_id);
             return true;
           }

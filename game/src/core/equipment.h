@@ -3,16 +3,15 @@
 
 #include <string>
 
-#include "event_effect_list.h"
 #include "i_event.h"
-#include "stat_modifier_list.h"
 #include "util/common.h"
+#include "volatile_attribute.h"
 
 namespace mengde {
 namespace core {
 
 class EventEffect;
-class StatModifier;
+class AttributeModifier;
 
 class Equipment : public IEvent {
  public:
@@ -23,21 +22,21 @@ class Equipment : public IEvent {
   virtual void RaiseEvent(event::OnCmdEvent, Unit*, CmdAct*) const override;
 
  public:
-  Equipment(const std::string&, Type);
+  Equipment(const std::string&, Type, unique_ptr<VolatileAttribute>&& va = std::make_unique<VolatileAttribute>());
   string GetId() const { return id_; }
   Type GetType() const { return type_; }
-  void AddModifier(StatModifier*);
+  void AddModifier(AttributeModifier*);
   void AddEffect(EventEffect*);
   void AddGeneralEffect(GeneralEventEffect*);
   void AddOnCmdEffect(OnCmdEventEffect*);
   Attribute CalcAddends() const;
   Attribute CalcMultipliers() const;
+  const VolatileAttribute& volatile_attribute() const { return *volatile_attribute_; }
 
  private:
   string id_;
   Type type_;
-  StatModifierList modifier_list_;
-  EventEffectList effect_list_;
+  unique_ptr<VolatileAttribute> volatile_attribute_;
 };
 
 }  // namespace core

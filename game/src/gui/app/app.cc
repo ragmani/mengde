@@ -1,9 +1,10 @@
 #include "app.h"
 
 #include "core/assets.h"
+#include "core/deserializer.h"
 #include "core/exceptions.h"
-#include "core/game.h"
 #include "core/scenario.h"
+#include "core/stage.h"
 #include "core/unit.h"
 #include "gui/foundation/color.h"
 #include "gui/foundation/event_fetcher.h"
@@ -63,8 +64,8 @@ App::App(int width, int height, uint32_t max_frames_sec)
   }
 
   Rect main_rect({0, 0}, window_size_);
-  main_view_ = new MainView(&main_rect, this);
-  window_ = new Window("Game", window_size_.x, window_size_.y);
+  main_view_ = new MainView(main_rect, this);
+  window_ = new Window("Stage", window_size_.x, window_size_.y);
   drawer_ = new Drawer(window_, GameEnv::GetInstance()->GetScenarioPath().ToString(),
                        GameEnv::GetInstance()->GetResourcePath().ToString());
 
@@ -87,18 +88,7 @@ App::~App() {
   Misc::Quit();
 }
 
-void App::SetupScenario(const string& scenario_id) {
-  try {
-    scenario_ = new core::Scenario(scenario_id);
-  } catch (const core::ConfigLoadException& e) {
-    // TODO Show error message appropriately
-    LOG_FATAL("Scenario config load failure - %s", e.what());
-    UNREACHABLE("Scenario config load failure.");
-  }
-
-  root_view_ = new RootView(Rect({0, 0}, window_size_), scenario_, this);
-  drawer_->SetBitmapBasePath((GameEnv::GetInstance()->GetScenarioPath() / scenario_id).ToString());
-}
+Path App::GetCurrentScenarioPath() const { return GameEnv::GetInstance()->GetScenarioPath() / scenario_->id(); }
 
 Drawer* App::GetDrawer() { return drawer_; }
 
@@ -141,6 +131,10 @@ void App::HandleEvents() {
         break;
       case EventType::kMouseWheel:
         target_view_->OnMouseWheelEvent(e.mouse_wheel);
+        break;
+      case EventType::kKey:
+        target_view_->OnKeyEvent(e.key);
+        break;
       default:
         break;
     }
@@ -168,17 +162,51 @@ void App::Render() {
 }
 
 void App::StartNewScenario(const string& scenario_id) {
-  main_view_->SetScenarioSelectViewVisible(false);
-  SetupScenario(scenario_id);
+  try {
+    scenario_ = new core::Scenario(scenario_id);
+  } catch (const core::ConfigLoadException& e) {
+    // TODO Show error message appropriately
+    LOG_FATAL("Scenario config load failure - %s", e.what());
+    UNREACHABLE("Scenario config load failure.");
+  }
+
+  root_view_ = new RootView(Rect({0, 0}, window_size_), scenario_, this);
+  drawer_->SetBitmapBasePath(GetCurrentScenarioPath().ToString());
+
+  target_view_ = root_view_;
+}
+
+void App::LoadScenario(const Path& savefile_path) {
+  try {
+    core::Deserializer deserializer{savefile_path};
+    auto scenario = deserializer.Deserialize();
+    scenario_ = scenario.release();
+  } catch (const core::ConfigLoadException& e) {
+    // TODO Show error message appropriately
+    LOG_FATAL("Savefile load failure - %s", e.what());
+    UNREACHABLE("Savefile load failure.");  // TODO Change this to throw
+  }
+
+  root_view_ = new RootView(Rect({0, 0}, window_size_), scenario_, this);
+  drawer_->SetBitmapBasePath(GetCurrentScenarioPath().ToString());
+
   target_view_ = root_view_;
 }
 
 void App::EndStage() {
   delete root_view_;
-  scenario_->NextStage();
-  root_view_ = new RootView(Rect({0, 0}, window_size_), scenario_, this);
-  target_view_ = root_view_;
-  LOG_DEBUG("root_view_ changed.");
+  bool has_next = scenario_->NextStage();
+
+  if (has_next) {
+    root_view_ = new RootView(Rect({0, 0}, window_size_), scenario_, this);
+    target_view_ = root_view_;
+  } else {
+    root_view_ = nullptr;
+    target_view_ = main_view_;
+
+    delete scenario_;
+    scenario_ = nullptr;
+  }
 
   /* For the case of end of the scenario
   // FIXME We can't delete these objects now since this function is called from

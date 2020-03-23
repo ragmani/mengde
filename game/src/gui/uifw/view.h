@@ -17,17 +17,16 @@ class Drawer;
 class View : public IView {
  public:
   View();
-  View(const Rect*);
   View(const Rect&);
   virtual ~View() {}
-  const Rect* GetFrame() { return &frame_; }
+  const Rect& GetFrame() { return frame_; }
   Rect GetActualFrame() const;
   Vec2D GetFrameSize() const;
   Vec2D GetActualFrameSize() const;
   Vec2D GetFrameCoords() const;
   Vec2D GetActualFrameCoords() const;
-  void SetCoords(Vec2D v) { frame_.SetPos(v); }
-  void SetSize(Vec2D v) { frame_.SetSize(v); }
+  void SetCoords(Vec2D v) { frame_.pos(v); }
+  void size(Vec2D v) { frame_.size(v); }
   void Move(Vec2D v) { frame_.Move(v); }
   void SetFrame(const Rect* r) { frame_ = *r; }
 
@@ -41,6 +40,7 @@ class View : public IView {
   bool DelegateMouseButtonEvent(const foundation::MouseButtonEvent&);
   bool DelegateMouseMotionEvent(const foundation::MouseMotionEvent&);
   bool DelegateMouseWheelEvent(const foundation::MouseWheelEvent&);
+  bool DelegateKeyEvent(const foundation::KeyEvent&);
 
  public:
   virtual void Render(Drawer*) override {}
@@ -48,6 +48,7 @@ class View : public IView {
   virtual bool OnMouseButtonEvent(const foundation::MouseButtonEvent&) override { return false; }
   virtual bool OnMouseMotionEvent(const foundation::MouseMotionEvent&) override { return false; }
   virtual bool OnMouseWheelEvent(const foundation::MouseWheelEvent&) override { return false; }
+  virtual bool OnKeyEvent(const foundation::KeyEvent&) override { return false; }
 
  public:
   bool RenderBegin(Drawer*);

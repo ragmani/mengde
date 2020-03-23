@@ -3,22 +3,23 @@
 #include "app.h"
 #include "config.h"
 #include "core/assets.h"
-#include "core/game.h"
+#include "core/stage.h"
 #include "core/unit.h"
 #include "core/user_interface.h"
 #include "gui/foundation/texture_manager.h"
 #include "gui/uifw/drawer.h"
 #include "gui/uifw/sprite_type.h"
+#include "model_finder.h"
+#include "resource_path.h"
 #include "ui_views.h"
 
 namespace mengde {
 namespace gui {
 namespace app {
 
-GameView::GameView(const Rect& frame, core::Game* game, App* app)
+GameView::GameView(const Rect& frame, core::UserInterface* gi, App* app)
     : View(frame),
-      game_(game),
-      gi_(game->user_interface()),
+      gi_{gi},
       app_(app),
       ui_state_machine_(),
       frame_callbacks_(),
@@ -33,10 +34,10 @@ GameView::GameView(const Rect& frame, core::Game* game, App* app)
   max_camera_coords_ = kMapSize - kWindowSize;
 
   ui_state_machine_.InitState();
-  ui_state_machine_.PushState(new StateUIView({game_, gi_, this}));
+  ui_state_machine_.PushState(new StateUIView({gi_, this}));
 }
 
-GameView::~GameView() { delete gi_; }
+GameView::~GameView() {}
 
 void GameView::Update() {
   frame_count_++;
@@ -48,9 +49,9 @@ void GameView::Render(Drawer* drawer) {
   drawer->SetOffset(camera_coords_);
 
   // Render Background
-  string path = gi_->GetMapId();
+  Path path = rcpath::MapPath(gi_->GetMapId());
   TextureManager* tm = drawer->GetTextureManager();
-  Texture* background = tm->FetchTexture(path);
+  Texture* background = tm->FetchTexture(path.ToString());
 
   const Vec2D kScreenSize = drawer->GetWindowSize();
   Rect src_rect({0, 0}, kScreenSize);
@@ -62,9 +63,26 @@ void GameView::Render(Drawer* drawer) {
   GetCurrentState()->Render(drawer);
 
   // Render units
-  gi_->ForEachUnit([this, drawer](uint32_t id, const core::Unit* unit) {
-    if (this->SkipRender(id) || unit->IsDead()) return;
-    RenderUnit(drawer, unit, unit->GetPosition());
+  gi_->ForEachUnit([this, drawer](const core::Unit* unit) {
+    if (this->SkipRender(unit->uid()) || unit->IsDead()) return;
+
+    RenderUnit(drawer, unit, unit->position());
+
+    {
+      int status_height = 0;
+      auto show_status = [&](core::Condition condition, const std::string& color) {
+        if (unit->condition_set().Has(condition)) {
+          drawer->SetDrawColor(COLOR(color));
+          // FIXME Do not calculate the position here
+          auto draw_coords = unit->position() * config::kBlockSize + 4;
+          draw_coords.y += status_height;
+          drawer->FillRect(Rect{draw_coords, {8, 8}});
+          status_height += 8;
+        }
+      };
+      show_status(core::Condition::kStunned, "yellow");
+      show_status(core::Condition::kRooted, "darkgray");
+    }
   });
 
   drawer->SetOffset({0, 0});
@@ -83,6 +101,8 @@ bool GameView::OnMouseWheelEvent(const foundation::MouseWheelEvent& e) {
   return GetCurrentState()->OnMouseWheelEvent(e);
 }
 
+bool GameView::OnKeyEvent(const foundation::KeyEvent& e) { return GetCurrentState()->OnKeyEvent(e); }
+
 void GameView::RenderUnit(Drawer* drawer, const core::Unit* unit, Vec2D pos) {
   SpriteType stype = unit->IsHPLow() ? kSpriteLowHP : kSpriteMove;
   int sprite_no = this->GetCurrentSpriteNo(2, app_->GetMaxFps() / 2);
@@ -92,7 +112,7 @@ void GameView::RenderUnit(Drawer* drawer, const core::Unit* unit, Vec2D pos) {
     sprite_no = 0;
     sprite_effect = {kEffectShade, 128};
   }
-  drawer->CopySprite(unit->GetModelId(), stype, unit->GetDirection(), sprite_no, sprite_effect, pos);
+  drawer->CopySprite(GetModelId(unit->uid()), stype, unit->direction(), sprite_no, sprite_effect, pos);
 }
 
 void GameView::ChangeUIState(StateUI* state_ui) {
@@ -119,9 +139,9 @@ void GameView::PopUIState() {
 void GameView::InitUIStateMachine() {
   NextFrame([this]() {
     ui_state_machine_.InitState();
-    ui_state_machine_.PushState(new StateUIView({game_, gi_, this}));
+    ui_state_machine_.PushState(new StateUIView({gi_, this}));
     if (gi_->HasNextCmd()) {
-      ui_state_machine_.PushState(new StateUIDoCmd({game_, gi_, this}));
+      ui_state_machine_.PushState(new StateUIDoCmd({gi_, this}));
     }
   });
 }
@@ -168,18 +188,42 @@ int GameView::GetCurrentSpriteNo(int num_sprites, int frames_per_sprite) const {
   return (frame_count_ / frames_per_sprite) % num_sprites;
 }
 
-void GameView::SetSkipRender(uint32_t id, bool b) {
-  auto o = skip_render_.find(id);
+void GameView::SetSkipRender(const core::UId& id, bool b) {
+  auto o = skip_render_.find(id.Value());
   bool found = (o != skip_render_.end());
   ASSERT(found != b);
   if (found) {
     skip_render_.erase(o);
   } else {
-    skip_render_.insert(id);
+    skip_render_.insert(id.Value());
   }
 }
 
-bool GameView::SkipRender(uint32_t id) const { return skip_render_.find(id) != skip_render_.end(); }
+bool GameView::SkipRender(const core::UId& id) const { return skip_render_.find(id.Value()) != skip_render_.end(); }
+
+#include "util/game_env.h"
+
+string GameView::GetModelId(const core::UId& uid) {
+  auto found = model_ids_.find(uid.Value());
+  if (found == model_ids_.end()) {
+    UpdateModelId(uid);
+  }
+
+  return model_ids_[uid.Value()];
+}
+
+void GameView::UpdateModelId(const core::UId& uid) {
+  auto unit = gi_->GetUnit(uid);
+  auto hero_id = unit->id();
+  auto hero_class = unit->hero_class()->id();
+  if (unit->ReadyPromotion()) {
+    hero_class = unit->hero_class()->promotion_info()->id;
+  }
+  auto force = unit->force();
+  auto model_id = FindModelId(app_->GetCurrentScenarioPath(), hero_class, hero_id, force);
+
+  model_ids_[uid.Value()] = model_id;
+}
 
 }  // namespace app
 }  // namespace gui

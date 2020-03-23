@@ -1,0 +1,222 @@
+namespace mengde.save;
+
+table Scenario {
+  id: string;
+  stage_id_list: [string];
+  stage_no: uint;
+  resource_managers: ResourceManagers;
+  assets: Assets;
+}
+
+table ResourceManagers {
+  terrain_manager: [Terrain];
+  hero_class_manager: [HeroClass];
+  magic_manager: [Magic];
+  equipment_manager: [Equipment];
+  hero_tpl_manager: [HeroTemplate];
+}
+
+table TerrainRecord {
+  id: string;
+  terrain: Terrain;
+}
+
+table Terrain {
+  id: string;
+//  index: int;
+  ascii: byte;
+  move_costs: [int];
+  class_effects: [int];
+}
+
+table HeroTemplate {
+  id: string;
+  hero_class: string;
+  attr: Attribute;
+}
+
+table HeroClass {
+  id: string;
+//  index: int;
+  attr_grade: Attribute;
+  attack_range: int;
+  move: int;
+  bi_hp: BaseIncr;
+  bi_mp: BaseIncr;
+  promotion_info: PromotionInfo;
+}
+
+struct BaseIncr {
+  base: int;
+  incr: int;
+}
+
+table PromotionInfo {
+  hero_class_id: string;
+  level: int;
+}
+
+struct Attribute {
+  atk: int;
+  def: int;
+  dex: int;
+  itl: int;
+  mor: int;
+}
+
+struct Position {
+  x: int;
+  y: int;
+}
+
+table Equipment {
+  id: string;
+  type: int; // Actually enum
+  volatile_attributes: VolatileAttributes;
+}
+
+table VolatileAttributes {
+  attribute_modifier_list: [AttributeModifier];
+  event_effect_list: [EventEffect];
+}
+
+table AttributeModifier {
+  id: string;
+  stat_idx: ushort;
+  turn: TurnBased;
+  change: AttributeChange;
+}
+
+struct TurnBased {
+  turns: ushort;
+}
+
+struct AttributeChange {
+  addend: short;
+  multiplier: short;
+}
+
+union EventEffectImpl {
+  GeneralEventEffect,
+  OnCmdEventEffect
+}
+
+union GeneralEventEffectImpl {
+  GEERestoreHp
+}
+
+union OnCmdEventEffectImpl {
+  OCEEPreemptiveAttack,
+  OCEEEnhanceBasicAttack,
+  OCEEDoubleAttack,
+  OCEECriticalAttack,
+  OCEECounterCounterAttack,
+  OCEEReflectAttack
+}
+
+table EventEffect {
+  turn: TurnBased;
+  instance: EventEffectImpl;
+}
+
+table GeneralEventEffect {
+  type: int; // GeneralEventType;
+  instance: GeneralEventEffectImpl;
+}
+
+table GEERestoreHp {
+  change: AttributeChange;
+}
+
+table OnCmdEventEffect {
+  type: int; // OnCmdEventType;
+  instance: OnCmdEventEffectImpl;
+}
+
+table OCEEPreemptiveAttack {
+}
+
+table OCEEEnhanceBasicAttack {
+  change: AttributeChange;
+}
+
+table OCEEDoubleAttack {
+}
+
+table OCEECriticalAttack {
+}
+
+table OCEECounterCounterAttack {
+}
+
+table OCEEReflectAttack {
+  multiplier: int16;
+}
+
+table Magic {
+  id: string;
+  range: int;
+  learn_info_list: [LearnInfo];
+  target_enemy: bool;
+  mp_cost: uint16;
+  effects: [MagicEffect];
+}
+
+struct LearnInfo {
+  id: uint16; // XXX maybe this should be string?
+  lv: uint16;
+}
+
+union MagicEffectImpl {
+  MagicEffectHp,
+  MagicEffectAttribute,
+  MagicEffectCondition
+}
+
+table MagicEffect {
+  type: int; // enum MagicEffectType
+  instance: MagicEffectImpl;
+}
+
+table MagicEffectHp {
+  power: int;
+}
+
+table MagicEffectAttribute {
+  attribute_modifier: AttributeModifier;
+}
+
+table MagicEffectCondition {
+  condition: int; // enum Condition
+  turn: TurnBased;
+}
+
+table Assets {
+  money: uint32;
+  heroes: [Hero];
+  equipments: [EquipmentWithAmount];
+}
+
+table EquipmentWithAmount {
+  equipment: string;
+  amount: uint32;
+}
+
+table Hero {
+  id: string;
+  equipment_set: EquipmentSet;
+  level: LevelExp;
+}
+
+struct LevelExp {
+  level: uint16;
+  exp: uint16;
+}
+
+table EquipmentSet {
+  weapon: string;
+  armor: string;
+  aid: string;
+}
+
+root_type Scenario;

@@ -4,11 +4,14 @@
 #include "core/equipment.h"
 #include "core/equipment_set.h"
 #include "core/hero.h"
+#include "deploy_view.h"
 #include "equipment_set_view.h"
+#include "game_view.h"
 #include "gui/uifw/image_view.h"
 #include "gui/uifw/layout_helper.h"
 #include "gui/uifw/row_major_list_view.h"
 #include "gui/uifw/text_view.h"
+#include "item_detail_view.h"
 #include "resource_path.h"
 
 namespace mengde {
@@ -19,7 +22,10 @@ namespace app {
 // EquipmentIconView
 //
 
-ItemIconView::ItemIconView(const Rect& frame, const string& equipment_id, uint32_t amount) : CallbackView(frame) {
+ItemIconView::ItemIconView(const Rect& frame, GameView* gv, const core::EquipmentWithAmount& equipment)
+    : CallbackView(frame), gv_(gv) {
+  const string& equipment_id = equipment.object->GetId();
+  uint32_t amount = equipment.amount;
   bg_color(COLOR("transparent"));
   padding(8);
 
@@ -29,15 +35,26 @@ ItemIconView::ItemIconView(const Rect& frame, const string& equipment_id, uint32
 
   Rect tv_amount_frame = GetActualFrame();
   TextView* tv_amount =
-      new TextView(&tv_amount_frame, std::to_string(amount), COLOR("white"), 14, LayoutHelper::kAlignRgtTop);
+      new TextView(tv_amount_frame, std::to_string(amount), COLOR("white"), 14, LayoutHelper::kAlignRgtTop);
   AddChild(tv_amount);
 
-  SetMouseMotionHandler([this](const foundation::MouseMotionEvent& e) {
+  SetMouseMotionHandler([this, equipment](const foundation::MouseMotionEvent& e) {
+    DeployView* deploy_view = this->gv_->deploy_view();
+    ItemDetailView* item_detail_view = this->gv_->item_detail_tooltip_view();
     if (e.IsMotionOver()) {
       this->bg_color(COLOR("darkgray"));
+      // Show Item Detail ToolTip
+      // DeployView coords + ItemIcon coords + MouseEvent coords + (ItemIcon height/2)
+      Vec2D pos =
+          deploy_view->GetActualFrameCoords() + this->GetFrameCoords() + e.GetCoords() + (this->GetFrameSize().y / 2);
+      item_detail_view->SetCoords(pos);
+      item_detail_view->visible(true);
+      item_detail_view->SetItem(equipment.object);
     } else {
       ASSERT(e.IsMotionOut());
       this->bg_color(COLOR("transparent"));
+      // Hide Item detail tooltip
+      item_detail_view->visible(false);
     }
     return true;
   });
@@ -47,8 +64,12 @@ ItemIconView::ItemIconView(const Rect& frame, const string& equipment_id, uint32
 // EquipmentSelectView
 //
 
-EquipmentSelectView::EquipmentSelectView(const Rect& frame, EquipmentSetView* equipment_set_view)
-    : CompositeView(frame), hero_(nullptr), equipment_list_view_(nullptr), equipment_set_view_(equipment_set_view) {
+EquipmentSelectView::EquipmentSelectView(const Rect& frame, GameView* gv, EquipmentSetView* equipment_set_view)
+    : CompositeView(frame),
+      gv_(gv),
+      hero_(nullptr),
+      equipment_list_view_(nullptr),
+      equipment_set_view_(equipment_set_view) {
   bg_color(COLOR("black"));
 }
 
@@ -58,11 +79,10 @@ void EquipmentSelectView::SetEquipments(const vector<core::EquipmentWithAmount>&
   RowMajorListView* new_list_view = new RowMajorListView(GetActualFrame(), kItemSize);
   ASSERT(hero_ != nullptr);
   if (hero_ == nullptr) return;
-  auto hero = assets->GetHero(hero_->GetId());  // For non-const core::Hero and capture
+  auto hero = assets->LookupHero(hero_->id());  // For non-const core::Hero and capture
   auto equipment_set_view = equipment_set_view_;
   for (auto equipment : equipments) {
-    ItemIconView* item_icon_view =
-        new ItemIconView(Rect(0, 0, kItemSize, kItemSize), equipment.object->GetId(), equipment.amount);
+    ItemIconView* item_icon_view = new ItemIconView(Rect(0, 0, kItemSize, kItemSize), gv_, equipment);
     item_icon_view->SetMouseButtonHandler(
         [this, assets, hero, equipment, equipment_set_view](const foundation::MouseButtonEvent& e) {
           if (e.IsLeftButtonUp()) {

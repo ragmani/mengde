@@ -3,38 +3,42 @@
 
 #include <stdint.h>
 
-#include <boost/optional.hpp>
 #include <utility>
 
-#include "cmd.h"
+#include "cmds.h"
+#include "id.h"
 #include "util/common.h"
 
 namespace mengde {
 namespace core {
 
 class Cell;
-class Game;
+class Stage;
 class PathTree;
 class Scenario;
 class Unit;
+class Turn;
+class MagicList;
+class IAIUnit;
+class HeroClass;
 
 class AvailableUnits {
  public:
-  AvailableUnits(Game* stage);
-  uint32_t Get(uint32_t idx);
+  AvailableUnits(Stage* stage);
+  UId Get(const UnitKey& ukey);
   uint32_t Count() const { return units_.size(); }
-  boost::optional<uint32_t> FindByPos(Vec2D pos);
+  UnitKey FindByPos(Vec2D pos);
 
  private:
-  vector<std::pair<uint32_t, Vec2D>> units_;
+  vector<std::pair<UId, Vec2D>> units_;
 };
 
 class AvailableMoves {
  public:
-  AvailableMoves(Game* stage, uint32_t unit_id);
-  Vec2D Get(uint32_t idx);
+  AvailableMoves(Stage* stage, const UnitKey& ukey);
+  Vec2D Get(const MoveKey& mkey);
   uint32_t Count() const { return moves_.size(); }
-  void ForEach(const std::function<void(uint32_t, Vec2D)>& fn);
+  void ForEach(const std::function<void(const MoveKey&, Vec2D)>& fn);
   const vector<Vec2D>& moves() { return moves_; }
 
  private:
@@ -43,47 +47,63 @@ class AvailableMoves {
 
 class AvailableActs {
  public:
-  AvailableActs(Game* stage, uint32_t unit_id, uint32_t move_id, ActionType type);
+  AvailableActs(Stage* stage, const UnitKey& unit_id, const MoveKey& move_id, ActionType type);
   ActionType type() { return type_; }
-  unique_ptr<CmdAct> Get(uint32_t idx);
+  unique_ptr<CmdAct> Get(const ActKey& akey);
   uint32_t Count() const { return acts_.size(); }
-  boost::optional<uint32_t> Find(Vec2D pos);
-  boost::optional<uint32_t> FindMagic(const string& magic_id, Vec2D pos);
+  ActKey Find(Vec2D pos);
+  ActKey FindMagic(const string& magic_id, Vec2D pos);
 
  private:
+  Stage* stage_;  // TODO Remove this
   ActionType type_;
   vector<unique_ptr<CmdAct>> acts_;
 };
 
 class UserInterface {
  public:
-  UserInterface(Game* stage);
+  UserInterface(Stage* stage);
 
  public:
-  AvailableUnits QueryUnits();
-  AvailableMoves QueryMoves(uint32_t unit_id);
-  AvailableActs QueryActs(uint32_t unit_id, uint32_t move_id, ActionType type);
-  void PushAction(uint32_t unit_id, uint32_t move_id, ActionType type, uint32_t act_id);
+  AvailableUnits QueryUnits() const;
+  AvailableMoves QueryMoves(const UnitKey& unit_key) const;
+  AvailableActs QueryActs(const UnitKey& unit_key, const MoveKey& move_id, ActionType type) const;
+  void PushAction(const UnitKey& unit_key, const MoveKey& move_id, ActionType type, const ActKey& act_id);
+  void PushPlayAI();
 
-  Unit* GetUnit(uint32_t unit_id);  // TODO Remove this and use only const version
-  const Unit* GetUnit(uint32_t unit_id) const;
+  const Unit* GetUnit(const UId& uid) const;
+  const Unit* GetUnit(const UnitKey& unit_key) const;
   const Unit* GetUnit(Vec2D pos) const;
   const Cell* GetCell(Vec2D pos) const;
-  vector<Vec2D> GetPath(uint32_t unit_id, Vec2D pos) const;
+  vector<Vec2D> GetPath(const UId& unit_id, Vec2D pos) const;
+  const IAIUnit* GetAIUnit(const UnitKey& unit_key) const;
+
+  std::shared_ptr<core::MagicList> GetMagicList(const UId& uid) const;
+  const Magic* GetMagic(const string& id) const;
+  const HeroClass* GetUnitClass(const string& id) const;
 
   Vec2D GetMapSize() const;
   string GetMapId() const;
+  const Map* GetMap() const;
 
   bool HasNextCmd() const;
+  const Cmd* GetNextCmd() const;
+  void DoNextCmd();
 
-  void ForEachUnit(const std::function<void(uint32_t, const Unit*)>& fn) const;
+  void ForEachUnit(const std::function<void(const Unit*)>& fn) const;
+
+  bool IsUserTurn() const;
+  bool IsAITurn() const;
+  const Turn& GetTurn() const;
+
+  bool IsValidCoords(Vec2D c) const;
 
  private:
-  Vec2D GetMovedPosition(uint32_t unit_id, uint32_t move_id);
-  unique_ptr<CmdAct> GetActCmd(uint32_t unit_id, uint32_t move_id, ActionType type, uint32_t act_id);
+  Vec2D GetMovedPosition(const UnitKey& unit_id, const MoveKey& move_id);
+  unique_ptr<CmdAct> GetActCmd(const UnitKey& unit_id, const MoveKey& move_id, ActionType type, const ActKey& act_id);
 
  private:
-  Game* stage_;
+  Stage* stage_;
 };
 
 }  // namespace core

@@ -1,6 +1,7 @@
 #include "event_effect.h"
 
-#include "cmd.h"
+#include "attribute_modifier.h"
+#include "cmds.h"
 #include "unit.h"
 
 namespace mengde {
@@ -8,56 +9,97 @@ namespace core {
 
 // class EventEffectBase
 
-EventEffectBase::EventEffectBase(uint16_t turns_left) : turns_left_(turns_left) {}
+EventEffectBase::EventEffectBase(TurnBased turn) : turn_{turn} {}
+
+void EventEffectBase::NextTurn() { turn_.Next(); }
 
 // class GeneralEventEffect
 
-GeneralEventEffect::GeneralEventEffect(event::GeneralEvent type, uint16_t turns_left)
-    : EventEffectBase(turns_left), type_(type) {}
+GeneralEventEffect::GeneralEventEffect(event::GeneralEvent type, TurnBased turn) : EventEffectBase(turn), type_(type) {}
 
 // class GeneralEventEffect
 
-OnCmdEventEffect::OnCmdEventEffect(event::OnCmdEvent type, uint16_t turns_left)
-    : EventEffectBase(turns_left), type_(type) {}
+OnCmdEventEffect::OnCmdEventEffect(event::OnCmdEvent type, TurnBased turn) : EventEffectBase(turn), type_(type) {}
 
 // GeneralEventEffect Derivatives
 
 // class GEERestoreHp
 
-GEERestoreHp::GEERestoreHp(event::GeneralEvent type, int multiplier, int addend, uint16_t turns_left)
-    : GeneralEventEffect(type, turns_left), multiplier_(multiplier), addend_(addend) {}
+GEERestoreHp::GEERestoreHp(event::GeneralEvent type, AttributeChange change, TurnBased turn)
+    : GeneralEventEffect{type, turn}, change_{change} {}
 
-unique_ptr<Cmd> GEERestoreHp::OnEvent(Unit* unit) {
-  return unique_ptr<Cmd>(new CmdRestoreHp(unit, multiplier_, addend_));
-}
+unique_ptr<Cmd> GEERestoreHp::OnEvent(Unit* unit) { return unique_ptr<Cmd>(new CmdRestoreHp{unit->uid(), change_}); }
 
 // OnCmdEventEffect Derivatives
 
 // class OCEEPreemptiveAttack
 
-OCEEPreemptiveAttack::OCEEPreemptiveAttack(event::OnCmdEvent type, uint16_t turns_left)
-    : OnCmdEventEffect(type, turns_left) {}
+OCEEPreemptiveAttack::OCEEPreemptiveAttack(event::OnCmdEvent type, TurnBased turn) : OnCmdEventEffect(type, turn) {}
 
 void OCEEPreemptiveAttack::OnEvent(Unit* unit, CmdAct* act) {
-  LOG_INFO("'%s' Preemptive Attack activated.", unit->GetId().c_str());
+  LOG_INFO("'%s' Preemptive Attack activated.", unit->id().c_str());
 
   // Must check if the unit is defender to prevent from effect duplication.
   //  Applying this effect twice will swap back the attacker and defender.
-  if (act->GetUnitDef() == unit) {
+  if (act->GetUnitDef() == unit->uid()) {
     act->SwapAtkDef();
   }
 }
 
 // class OCEEEnhanceBasicAttack
-OCEEEnhanceBasicAttack::OCEEEnhanceBasicAttack(event::OnCmdEvent type, int multiplier, int addend, uint16_t turns_left)
-    : OnCmdEventEffect(type, turns_left), multiplier_(multiplier), addend_(addend) {}
+OCEEEnhanceBasicAttack::OCEEEnhanceBasicAttack(event::OnCmdEvent type, CmdBasicAttack::Type ba_type,
+                                               AttributeChange change, TurnBased turn)
+    : OnCmdEventEffect{type, turn}, ba_type_{ba_type}, change_{change} {}
 
 void OCEEEnhanceBasicAttack::OnEvent(Unit* unit, CmdAct* act) {
-  LOG_INFO("'%s' the damage will be enhanced by (%d%%,+%d)", unit->GetId().c_str(), multiplier_, addend_);
   CmdBasicAttack* ba = dynamic_cast<CmdBasicAttack*>(act);
-  ASSERT(ba != nullptr);
-  ba->AddToMultiplier(multiplier_);
-  ba->AddToAddend(addend_);
+
+  if (ba && (ba_type_ | ba->type())) {
+    LOG_INFO("@%'s damage is enhanced by (%d%%,+%d)", unit->id().c_str(), change_.multiplier, change_.addend);
+    ba->UpdateChange(change_);
+  }
+}
+
+OCEEDoubleAttack::OCEEDoubleAttack(event::OnCmdEvent type, TurnBased turn) : OnCmdEventEffect{type, turn} {}
+
+void OCEEDoubleAttack::OnEvent(Unit* unit, CmdAct* act) {
+  CmdBasicAttack* ba = dynamic_cast<CmdBasicAttack*>(act);
+  if (ba) {
+    LOG_INFO("@%s does double attack", unit->id().c_str());
+    ba->ForceDouble();
+  }
+}
+
+OCEECriticalAttack::OCEECriticalAttack(event::OnCmdEvent type, TurnBased turn) : OnCmdEventEffect{type, turn} {}
+
+void OCEECriticalAttack::OnEvent(Unit* unit, CmdAct* act) {
+  CmdBasicAttack* ba = dynamic_cast<CmdBasicAttack*>(act);
+  if (ba) {
+    LOG_INFO("@%s does critical attack", unit->id().c_str());
+    ba->ForceCritical();
+  }
+}
+
+OCEECounterCounterAttack::OCEECounterCounterAttack(event::OnCmdEvent type, TurnBased turn)
+    : OnCmdEventEffect{type, turn} {}
+
+void OCEECounterCounterAttack::OnEvent(Unit* unit, CmdAct* act) {
+  CmdBasicAttack* ba = dynamic_cast<CmdBasicAttack*>(act);
+  if (ba) {
+    LOG_INFO("@%s does counter-counter attack", unit->id().c_str());
+    ba->ForceCounter2(unit->uid());
+  }
+}
+
+OCEEReflectAttack::OCEEReflectAttack(event::OnCmdEvent type, int16_t multiplier, TurnBased turn)
+    : OnCmdEventEffect{type, turn}, multiplier_{multiplier} {}
+
+void OCEEReflectAttack::OnEvent(Unit* unit, CmdAct* act) {
+  CmdBasicAttack* ba = dynamic_cast<CmdBasicAttack*>(act);
+  if (ba) {
+    LOG_INFO("@%s reflect attack by %d%%", unit->id().c_str());
+    ba->ForceReflect(multiplier_);
+  }
 }
 
 }  // namespace core

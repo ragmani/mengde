@@ -1,5 +1,5 @@
 #include "commander.h"
-#include "cmd.h"
+#include "cmd_queue.h"
 
 namespace mengde {
 namespace core {
@@ -13,7 +13,7 @@ const Cmd* Commander::GetNextCmdConst() const {
   return cmdq_current_->GetNextCmdConst();
 }
 
-void Commander::DoNext(Game* game) {
+void Commander::DoNext(Stage* game) {
   ASSERT(HasNext());
   auto cmd_done = cmdq_current_->Do(game);
   cmdq_history_->Append(std::move(cmd_done));
@@ -22,12 +22,6 @@ void Commander::DoNext(Game* game) {
 void Commander::Push(unique_ptr<Cmd> cmd) {
   ///  ASSERT(cmd != nullptr);
   cmdq_current_->Append(std::move(cmd));
-}
-
-void Commander::DebugPrint() const {
-#ifdef DEBUG
-  cmdq_current_->DebugPrint();
-#endif  // DEBUG
 }
 
 }  // namespace core

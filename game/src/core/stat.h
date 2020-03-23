@@ -7,7 +7,7 @@ namespace mengde {
 namespace core {
 
 struct Attribute {
-  enum { kStatIdAtk, kStatIdDef, kStatIdDex, kStatIdItl, kStatIdMor };
+  static const char* kToString[];
 
   int atk;
   int def;
@@ -15,26 +15,15 @@ struct Attribute {
   int itl;
   int mor;
 
-  Attribute() : atk(0), def(0), dex(0), itl(0), mor(0) {}
+  Attribute() : Attribute{0, 0, 0, 0, 0} {}
 
-  Attribute(int atk, int def, int dex, int itl, int mor) : atk(atk), def(def), dex(dex), itl(itl), mor(mor) {}
+  Attribute(int atk, int def, int dex, int itl, int mor) : atk{atk}, def{def}, dex{dex}, itl{itl}, mor{mor} {}
 
   void ApplyModifier(const Attribute& addend, const Attribute& multiplier);
 
-  int GetValueByIndex(int index) const {
-    // Fragile but fast implementation
-    return *((int*)(this) + index);
-  }
+  int& operator[](uint32_t index) { return *((int*)(this) + index); }
 
-  void AddValueByIndex(int index, int value) {
-    // Fragile but fast implementation
-    ((int*)(this))[index] += value;
-  }
-
-  void SetValueByIndex(int index, int value) {
-    // Fragile but fast implementation
-    ((int*)(this))[index] = value;
-  }
+  int operator[](uint32_t index) const { return *((int*)(this) + index); }
 };
 
 #define ATTRIBUTE_BIN_OP_DECL(OP) Attribute operator OP(const Attribute& lhs, const Attribute& rhs);
@@ -91,7 +80,7 @@ struct HpMp {
 };
 
 struct Level {
-  static const uint16_t kExpLimit = 100;
+  static const uint16_t kExpLimit = 200;
 
   uint16_t level;
   uint16_t exp;

@@ -13,14 +13,14 @@ namespace app {
 UnitListView::UnitDetailView::UnitDetailView(const Rect& frame)
     : CompositeView(frame), unit_(nullptr), tv_name_(nullptr) {
   Rect tv_name_frame({0, 0}, {200, 100});
-  tv_name_ = new TextView(&tv_name_frame);
+  tv_name_ = new TextView(tv_name_frame);
   AddChild(tv_name_);
 }
 
 void UnitListView::UnitDetailView::SetUnit(const core::Unit* unit) {
   unit_ = unit;
 
-  string name = unit->GetId();
+  string name = unit->id();
   tv_name_->SetText(name);
 }
 
@@ -50,7 +50,7 @@ UnitListView::UnitListView(const Rect& frame, const vector<const core::Unit*>& u
     Rect list_view_frame({0, 0}, list_view_size);
     VerticalListView* list_view = new VerticalListView(list_view_frame);
     for (auto unit : unit_list_) {
-      std::string name = unit->GetId();
+      std::string name = unit->id();
       Rect button_frame({0, 0}, {list_view_size.x, element_height});
       ButtonView* button = new ButtonView(&button_frame, name);
       button->SetMouseButtonHandler([this, unit](const foundation::MouseButtonEvent& e) {

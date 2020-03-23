@@ -7,24 +7,30 @@ namespace core {
 
 StageUnitManager::StageUnitManager() : units_() {}
 
-uint32_t StageUnitManager::Deploy(Unit* unit) {
-  uint32_t unit_id = units_.size();
+UId StageUnitManager::Deploy(Unit* unit) {
+  UId uid{static_cast<uint32_t>(units_.size())};
   units_.push_back(unit);
-  return unit_id;
+  unit->uid(uid);
+  return uid;
 }
 
 void StageUnitManager::Kill(Unit* unit) { unit->Kill(); }
 
-Unit* StageUnitManager::Get(uint32_t id) {
-  ASSERT(id < units_.size());
-  return units_[id];
+Unit* StageUnitManager::Get(const UId& id) {
+  ASSERT(id);
+  ASSERT_LT(id.Value(), units_.size());
+  return units_[id.Value()];
 }
+
+void StageUnitManager::SetAIMode(const UId& id, AIMode mode) { ai_unit_manager_.Set(id, mode); }
+
+const IAIUnit* StageUnitManager::GetAIUnit(const UId& id) { return ai_unit_manager_.Get(id); }
 
 void StageUnitManager::ForEach(function<void(Unit*)> fn) { std::for_each(units_.begin(), units_.end(), fn); }
 
-void StageUnitManager::ForEachIdxConst(function<void(uint32_t, const Unit*)> fn) const {
+void StageUnitManager::ForEachConst(function<void(const Unit*)> fn) const {
   for (uint32_t i = 0, size = units_.size(); i < size; i++) {
-    fn(i, units_[i]);
+    fn(units_[i]);
   }
 }
 

@@ -19,42 +19,35 @@ Let's take a look at the details for each.
 
 ```
 sce
-└── {example}
-    ├── config.lua
-    ├── stage
-    │   ├── {01}.lua
-    │   └── {02}.lua
-    ├── equipment
-    │   ├── {heaven_sword}.bmp
-    │   └── {short_sword}.bmp
-    ├── magic
-    │   ├── {buff_dex}.bmp
-    │   ├── {fire_0}.bmp
-    │   ├── {heal_0}.bmp
-    ├── map
-    │   ├── {01}.bmp
-    │   └── {02}.bmp
-    ├── model
-    │   ├── {CaoCao-1}
-    │   │   ├── atk.bmp
-    │   │   ├── mov.bmp
-    │   │   └── spc.bmp
-    │   ├── {CaoCao-2}
-    │   │   ├── atk.bmp
-    │   │   ├── mov.bmp
-    │   │   └── spc.bmp
-    │   ├── {CaoCao-3}
-    │   │   ├── atk.bmp
-    │   │   ├── mov.bmp
-    │   │   └── spc.bmp
-    │   └── {GuanYu}
-    │       ├── atk.bmp
-    │       ├── mov.bmp
-    │       └── spc.bmp
-    └── portrait
-        ├── {CaoCao}.bmp
-        ├── {CaoHong}.bmp
-        └── {ZhangLiao}.bmp
+└── {example}                          # Scenario ID
+    ├── gui                            # GUI resources
+    │   ├── equipment                  # Equipment images
+    │   │   ├── {heaven_sword}.bmp
+    │   │   └── {short_sword}.bmp
+    │   ├── magic                      # Magic sprites
+    │   │   ├── {fire_0}.bmp
+    │   │   ├── {fire_1}.bmp
+    │   │   └── {heal_0}.bmp
+    │   ├── map                        # Background map images
+    │   │   ├── {stage_01}.bmp
+    │   │   └── {stage_01}.bmp
+    │   ├── model                      # Unit sprites
+    │   │   ├── {CaoCao-1}
+    │   │   │   ├── atk.bmp
+    │   │   │   ├── mov.bmp
+    │   │   │   └── spc.bmp
+    │   │   └── {GuanYu}
+    │   │       ├── atk.bmp
+    │   │       ├── mov.bmp
+    │   │       └── spc.bmp
+    │   └── portrait                   # Hero portrait images
+    │       ├── {CaoCao}.bmp
+    │       ├── {CaoHong}.bmp
+    │       └── {ZhangLiao}.bmp
+    └── script                         # Global/Stage Scripts
+        ├── {stage_01}.lua
+        ├── {stage_02}.lua
+        └── config.lua                 # Global config script
 ```
 
 ### Bitmap Resource
@@ -75,23 +68,42 @@ In the configuration, there will be all information that is samely affected in c
 
 #### The Game Flow
 
-One must define these functions in the global scope of Lua.
+You should call some set(register) functions from `main` function.
 
-1. `on_deploy(game)`
-	- Called when the very beggining of the stage
-	- Generate own units
-1. `on_begin(game)`
-	- Called right after the deployment
-	- Generate allies and enemies
-1. `end_condition(game)`
-	- Called every time after an unit does its action
-	- Must return an enum value - whether victory, defeat or undecided
-1. `on_victory(game)`
-	- Called when win the stage
-	- Add actions for the units on victory
-1. `on_defeat(game)`
-	- Called when lose the stage
-	- Add actions for the units on defeat
+For example,
+
+```lua
+function end_condition(game)
+    -- some code for end condition
+end
+
+function main(game)
+    game:set_end_condition(end_condition)
+end
+```
+
+Here is the list of register C APIs. Note that this list can change frequently as we are in the beggining stage of the development.
+
+1. `game:set_on_deploy(callback)`, where `void callback(game)`
+    - (Required)
+    - Called when the very beggining of the stage
+    - Generate own units
+1. `game:set_on_begin(callback)`, where `void callback(game)`
+    - (Required)
+    - Called right after the deployment
+    - Generate allies and enemies
+1. `game:set_on_victory(callback)`, where `void callback(game)`
+    - (Required)
+    - Called when win the stage
+    - Add actions for the units on victory
+1. `game:set_on_defeat(callback)`, where `void callback(game)`
+    - (Required)
+    - Called when lose the stage
+    - Add actions for the units on defeat
+1. `game:set_end_condition(callback)`, where `int callback(game)`
+    - (Required)
+    - Called every time after an unit does its action
+    - Must return an enum value - whether victory, defeat or undecided
 
 #### How to Write Script for Stage
 

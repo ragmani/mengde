@@ -2,18 +2,18 @@
 
 #include "cmd.h"  // TODO Only for CmdQueue
 #include "equipment_set.h"
-#include "unit_class.h"
+#include "hero_class.h"
 
 namespace mengde {
 namespace core {
 
-Unit::Unit(const Hero* hero, Force force)
-    : hero_(new Hero(*hero)),  // NOTE deep-copy is done here
+Unit::Unit(Hero* hero, Force force)
+    : hero_(hero),
       equipment_set_(new EquipmentSet(this)),
       current_attr_(hero->GetOriginalAttr()),
       current_hpmp_(hero->GetOriginalHpMp()),
-      modifier_list_(),
-      effect_list_(),
+      volatile_attribute_{},
+      condition_set_{},
       position_(0, 0),
       direction_(kDirDown),
       force_(force),
@@ -43,15 +43,13 @@ bool Unit::IsHostile(const Unit* u) const {
   return false;
 }
 
-string Unit::GetId() const { return hero_->GetId(); }
+string Unit::id() const { return hero_->id(); }
 
 uint16_t Unit::GetLevel() const { return hero_->GetLevel(); }
 
 uint16_t Unit::GetExp() const { return hero_->GetExp(); }
 
-int Unit::GetMove() const { return hero_->GetMove(); }
-
-string Unit::GetModelId() const { return hero_->GetModelId(); }
+int Unit::move() const { return hero_->move(); }
 
 const Attribute& Unit::GetOriginalAttr() const { return hero_->GetUnitPureStat(); }
 
@@ -61,15 +59,21 @@ void Unit::UpdateStat() {
   // TODO update HpMp
   current_attr_ = hero_->GetUnitPureStat();
   {
-    Attribute addends = modifier_list_.CalcAddends() + equipment_set_->CalcAddends();
-    Attribute multipliers = modifier_list_.CalcMultipliers() + equipment_set_->CalcMultipliers();
+    const auto& modifier_list = volatile_attribute_.attribute_modifier_list();
+    Attribute addends = modifier_list.CalcAddends() + equipment_set_->CalcAddends();
+    Attribute multipliers = modifier_list.CalcMultipliers() + equipment_set_->CalcMultipliers();
 
     current_attr_.ApplyModifier(addends, multipliers);
   }
 }
 
-void Unit::AddStatModifier(StatModifier* sm) {
-  modifier_list_.AddModifier(sm);
+void Unit::NextTurn() {
+  volatile_attribute_.NextTurn();
+  condition_set_.NextTurn();
+}
+
+void Unit::AddAttributeModifier(AttributeModifier* sm) {
+  volatile_attribute_.attribute_modifier_list().AddModifier(sm);
   UpdateStat();
 }
 
@@ -79,11 +83,11 @@ bool Unit::IsDead() const { return GetCurrentHpMp().hp <= 0; }
 
 void Unit::Kill() { current_hpmp_.hp = 0; }
 
-const UnitClass* Unit::GetClass() const { return hero_->GetClass(); }
+const HeroClass* Unit::hero_class() const { return hero_->hero_class(); }
 
-int Unit::GetClassIndex() const { return hero_->GetClassIndex(); }
+int Unit::class_index() const { return hero_->class_index(); }
 
-const AttackRange& Unit::GetAttackRange() const { return hero_->GetAttackRange(); }
+const AttackRange& Unit::attack_range() const { return hero_->attack_range(); }
 
 bool Unit::IsInRange(Vec2D c, const AttackRange& range) const {
   Vec2D dv = c - position_;
@@ -95,26 +99,25 @@ bool Unit::IsInRange(Vec2D c, const AttackRange& range) const {
   return res;
 }
 
-bool Unit::IsInRange(Vec2D c) const { return IsInRange(c, GetAttackRange()); }
+bool Unit::IsInRange(Vec2D c) const { return IsInRange(c, attack_range()); }
 
-void Unit::GainExp(Unit* object) {
-  int level_diff = object->GetLevel() - this->GetLevel();
-  uint16_t exp = 0;
-  if (level_diff < 0) {
-    exp = std::max(1, 8 + level_diff);
-  } else {
-    exp = std::min(100, 8 + 2 * level_diff);
-  }
-  GainExp(exp);
+bool Unit::GainExp(uint16_t exp) {
+  hero_->GainExp(exp);
+  return hero_->IsExpFull();
 }
-
-void Unit::GainExp(uint16_t exp) { hero_->GainExp(exp); }
 
 void Unit::LevelUp() {
   // TODO check if Unit is alread in max level
   hero_->LevelUp();
   UpdateStat();
-  LOG_INFO("'%s' Level Up! (Level : %d)", hero_->GetId().c_str(), hero_->GetLevel());
+  LOG_INFO("'%s' Level Up! (Level : %d)", hero_->id().c_str(), hero_->GetLevel());
+}
+
+bool Unit::ReadyPromotion() const { return hero_->ReadyPromotion(); }
+
+void Unit::Promote(const HeroClassManager* hcm) {
+  hero_->Promote(hcm);
+  UpdateStat();
 }
 
 void Unit::EndAction() { done_action_ = true; }

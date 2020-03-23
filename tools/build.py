@@ -3,15 +3,23 @@
 import argparse
 import multiprocessing
 import time
+import os
 from cmd_helpers import *
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("buildtype",   default="Debug", help="build type", choices=["Debug", "Release"], nargs="?")
-    parser.add_argument("--buildpath", default="build", help="specify build path")
-    parser.add_argument("--clean",     default=False,   help="clean before build", dest="clean", action="store_true")
-    parser.add_argument("--single",    default=False,   help="disalbe parallel build", dest="single", action="store_true")
-    parser.add_argument("--cross",     default="",      help="cross build target", choices=["", "armv7l"])
+    parser.add_argument("buildtype",   default="Debug",
+                        help="build type", choices=["Debug", "Release"], nargs="?")
+    parser.add_argument("--buildpath", default="build",
+                        help="specify build path")
+    parser.add_argument("--clean",     default=False,
+                        help="clean before build", dest="clean", action="store_true")
+    parser.add_argument("--single",    default=False,
+                        help="disalbe parallel build", dest="single", action="store_true")
+    parser.add_argument("--cross",     default="",
+                        help="cross build target", choices=["", "armv7l"])
+    parser.add_argument("--generator", default="Unix Makefiles",
+                        help="cmake generator", choices=["Unix Makefiles", "Xcode"])
 
     return parser.parse_args()
 
@@ -26,7 +34,7 @@ def main():
         machine = "armv7l"
 
     # Set the install folder
-    install_folder = "mengde"
+    install_folder = "bin"
 
     home_folder = os.getcwd()
 
@@ -35,10 +43,11 @@ def main():
     check_run_cmd("mkdir", ["-p", build_dir])
     os.chdir(build_dir)
 
-    cmake_config = ["../" * (build_dir.count("/") + 1),
+    cmake_config = ["-G",
+                    options.generator,
+                    "../" * (build_dir.count("/") + 1),
                     "-DCMAKE_BUILD_TYPE=" + options.buildtype,
                     "-DCMAKE_INSTALL_PREFIX=./",
-                    "-DINSTALL_FOLDER=" + install_folder,
                     "-DCMAKE_EXPORT_COMPILE_COMMANDS=1"]
 
     if options.cross == "armv7l":
@@ -48,6 +57,9 @@ def main():
         cmake_config += ["-DCMAKE_TOOLCHAIN_FILE=" + toolchain]
 
     check_run_cmd("cmake", cmake_config)
+
+    if options.generator != "Unix Makefiles":
+        return
 
     # From here, support `Makefile` project only
     make_args = []
@@ -71,6 +83,8 @@ def main():
     if not path_exists(res_path):
         os.mkdir(res_path)
 
+    print(os.getcwd())
+
     font_url = "https://github.com/powerline/fonts/raw/master/LiberationMono/Literation%20Mono%20Powerline.ttf"
     font_filename = "Literation Mono Powerline.ttf"
     font_filepath = os.path.join(res_path, font_filename)
@@ -86,7 +100,7 @@ def main():
         os.mkdir(res_ipath)
 
     font_ifilepath = os.path.join(res_ipath, font_filename)
-    if not path_exists(font_ifilepath):
+    if path_exists(font_filepath) and not path_exists(font_ifilepath):
         shutil.copyfile(font_filepath, font_ifilepath)
 
 if __name__ == "__main__":

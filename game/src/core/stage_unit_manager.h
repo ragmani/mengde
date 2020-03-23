@@ -1,6 +1,11 @@
 #ifndef MENGDE_CORE_STAGE_UNIT_MANAGER_H_
 #define MENGDE_CORE_STAGE_UNIT_MANAGER_H_
 
+#include <unordered_map>
+
+#include "ai_mode.h"
+#include "ai_unit_manager.h"
+#include "id.h"
 #include "util/common.h"
 
 namespace mengde {
@@ -16,15 +21,17 @@ class Unit;
 class StageUnitManager {
  public:
   StageUnitManager();
-  uint32_t Deploy(Unit*);
+  UId Deploy(Unit*);
   void Kill(Unit*);
-  Unit* Get(uint32_t);
+  Unit* Get(const UId& id);
+  void SetAIMode(const UId& id, AIMode mode);
+  const IAIUnit* GetAIUnit(const UId& id);
   void ForEach(function<void(Unit*)>);
-  void ForEachIdxConst(function<void(uint32_t, const Unit*)> fn) const;
+  void ForEachConst(function<void(const Unit*)> fn) const;
 
  private:
   vector<Unit*> units_;
-  //  vector<bool>  units_status_;
+  AIUnitManager ai_unit_manager_;
 };
 
 }  // namespace core

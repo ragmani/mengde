@@ -14,9 +14,9 @@ namespace mengde {
 namespace gui {
 namespace app {
 
-MagicListView::MagicListView(const Rect& frame, core::Game* game, core::UserInterface* gi, GameView* gv)
+MagicListView::MagicListView(const Rect& frame, core::Stage* game, core::UserInterface* gi, GameView* gv)
     : CompositeView(frame),
-      game_(game),
+      stage_(game),
       gi_(gi),
       gv_(gv),
       item_height_(24),
@@ -27,14 +27,15 @@ MagicListView::MagicListView(const Rect& frame, core::Game* game, core::UserInte
 
   {
     Rect frame(0, 0, GetActualFrameSize().x, kTitleHeight);
-    tv_title_ = new TextView(&frame, "Choose Magic", COLOR("yellow"), 15, LayoutHelper::kAlignCenter);
+    tv_title_ = new TextView(frame, "Choose Magic", COLOR("yellow"), 15, LayoutHelper::kAlignCenter);
     this->AddChild(tv_title_);
   }
 }
 
 MagicListView::~MagicListView() {}
 
-void MagicListView::SetData(uint32_t unit_id, uint32_t move_id, shared_ptr<core::MagicList> magic_list) {
+void MagicListView::SetData(const core::UnitKey& ukey, const core::MoveKey& mkey,
+                            shared_ptr<core::MagicList> magic_list) {
   // TODO For decorators, who should remove the wrapped object? Manually managing it is too complicated
   if (lv_magics_wrap_ != nullptr) {
     this->RemoveChild(lv_magics_wrap_);
@@ -60,13 +61,13 @@ void MagicListView::SetData(uint32_t unit_id, uint32_t move_id, shared_ptr<core:
     string name = magic->GetId();
 
     // Variables to be captured for callback
-    StateUI::Base base = {game_, gi_, gv_};
+    StateUI::Base base = {gi_, gv_};
 
     Rect button_frame({0, 0}, {frame_size.x, item_height_});
     ButtonView* button = new ButtonView(&button_frame, name);
-    button->SetMouseButtonHandler([base, unit_id, move_id, id](const foundation::MouseButtonEvent& e) {
+    button->SetMouseButtonHandler([base, ukey, mkey, id](const foundation::MouseButtonEvent& e) {
       if (e.IsLeftButtonUp()) {
-        base.gv->PushUIState(new StateUITargeting(base, unit_id, move_id, id));
+        base.gv->PushUIState(new StateUITargeting(base, ukey, mkey, id));
         return true;
       }
       return false;

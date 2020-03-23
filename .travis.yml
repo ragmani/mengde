@@ -1,20 +1,25 @@
 
 language: cpp
 
+branches:
+    only:
+        - master
+
 matrix:
     include:
         - os: osx
-          osx_image: xcode8
+          osx_image: xcode9
           compiler:
               - clang
           before_install:
-              - ./ci/install_deps_osx.sh
+              - ./ci/install_deps_macos.sh
           cache:
               directories:
                   - $HOME/Library/Caches/Homebrew
           script: 
               - ./ci/clang-format.sh
-              - tools/build.py
+              - tools/build.py Debug
+              - tools/build.py Release
               - tools/unit_test.py
 
         - os: linux
@@ -27,5 +32,6 @@ matrix:
           script:
               # clang format is disabled for ubuntu due to version issue
 #              - ./ci/clang-format.sh
-              - docker run --rm -it -v $(pwd):/root/mengde -w /root/mengde mengde tools/build.py
+              - docker run --rm -it -v $(pwd):/root/mengde -w /root/mengde mengde tools/build.py Debug
+              - docker run --rm -it -v $(pwd):/root/mengde -w /root/mengde mengde tools/build.py Release
               - docker run --rm -it -v $(pwd):/root/mengde -w /root/mengde mengde tools/unit_test.py

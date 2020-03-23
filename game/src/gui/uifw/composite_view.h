@@ -13,7 +13,6 @@ namespace uifw {
 class CompositeView : public View {
  public:
   CompositeView();
-  CompositeView(const Rect*);
   CompositeView(const Rect&);
   virtual ~CompositeView();
   int AddChild(View*);
@@ -30,6 +29,7 @@ class CompositeView : public View {
   virtual bool OnMouseButtonEvent(const foundation::MouseButtonEvent&) override;
   virtual bool OnMouseMotionEvent(const foundation::MouseMotionEvent&) override;
   virtual bool OnMouseWheelEvent(const foundation::MouseWheelEvent&) override;
+  virtual bool OnKeyEvent(const foundation::KeyEvent&) override;
 
  private:
   std::vector<View*> children_;

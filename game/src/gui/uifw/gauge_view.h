@@ -17,8 +17,8 @@ class GaugeView : public View {
   enum HelpTextType { kHelpTextNone, kHelpTextCurMax, kHelpTextCurOnly };
 
  public:
-  GaugeView(const Rect*, int, int, Color, Color);
-  GaugeView(const Rect*, int, int, int, Color, Color, Color);
+  GaugeView(const Rect&, int, int, Color, Color);
+  GaugeView(const Rect&, int, int, int, Color, Color, Color);
   virtual ~GaugeView();
   int GetCurVal() { return cur_val_; }
   int GetMaxVal() { return max_val_; }
@@ -31,6 +31,7 @@ class GaugeView : public View {
   void SetExtVal(int v) { ext_val_ = v; }
   void SetHelpTextType(HelpTextType v) { help_text_type_ = v; }
   void SetHelpTextAlign(LayoutHelper::Align v) { help_text_align_ = v; }
+  void SetExtColor(Color color) { ext_color_ = color; }
   virtual void Render(Drawer*) override;
 
  private:

@@ -1,9 +1,10 @@
 #ifndef MENGDE_CORE_EVENT_EFFECT_H_
 #define MENGDE_CORE_EVENT_EFFECT_H_
 
-#include <limits>
-
+#include "attribute_modifier.h"
+#include "cmds.h"
 #include "event_types.h"
+#include "turn_based.h"
 #include "util/common.h"
 
 namespace mengde {
@@ -19,25 +20,23 @@ class Unit;
 
 class EventEffectBase {
  public:
-  static const uint16_t kTurnInfinity = std::numeric_limits<uint16_t>::max();
-
- public:
-  EventEffectBase(uint16_t turns_left);
+  EventEffectBase(TurnBased turn = TurnBased{});
   virtual ~EventEffectBase() = default;
-  uint16_t GetTurnsLeft() { return turns_left_; }
+  const TurnBased& turn() const { return turn_; }
   void NextTurn();
 
  private:
-  uint16_t turns_left_;
+  TurnBased turn_;
 };
 
 // GeneralEventEffect is event effect that can generate Cmds
 
 class GeneralEventEffect : public EventEffectBase {
  public:
-  GeneralEventEffect(event::GeneralEvent type, uint16_t turns_left);
+  GeneralEventEffect(event::GeneralEvent type, TurnBased turn = TurnBased{});
   virtual unique_ptr<Cmd> OnEvent(Unit* unit) = 0;
-  bool typeof(event::GeneralEvent type) { return type_ == type; }
+  bool type(event::GeneralEvent type) { return type_ == type; }
+  event::GeneralEvent type() const { return type_; }
 
  private:
   event::GeneralEvent type_;
@@ -48,9 +47,10 @@ class GeneralEventEffect : public EventEffectBase {
 
 class OnCmdEventEffect : public EventEffectBase {
  public:
-  OnCmdEventEffect(event::OnCmdEvent type, uint16_t turns_left);
+  OnCmdEventEffect(event::OnCmdEvent type, TurnBased turn = TurnBased{});
   virtual void OnEvent(Unit* unit, CmdAct* act) = 0;
-  bool typeof(event::OnCmdEvent type) { return type_ == type; }
+  bool type(event::OnCmdEvent type) { return type_ == type; }
+  event::OnCmdEvent type() const { return type_; }
 
  private:
   event::OnCmdEvent type_;
@@ -64,30 +64,60 @@ class OnCmdEventEffect : public EventEffectBase {
 
 class GEERestoreHp : public GeneralEventEffect {
  public:
-  GEERestoreHp(event::GeneralEvent type, int multiplier, int addend, uint16_t turns_left = kTurnInfinity);
+  GEERestoreHp(event::GeneralEvent type, AttributeChange change, TurnBased turn = TurnBased{});
   virtual unique_ptr<Cmd> OnEvent(Unit* unit) override;
+  AttributeChange change() const { return change_; }
 
  private:
-  int multiplier_;
-  int addend_;
+  AttributeChange change_;
 };
 
 // OnCmdEventEffect Dervatives
 
 class OCEEPreemptiveAttack : public OnCmdEventEffect {
  public:
-  OCEEPreemptiveAttack(event::OnCmdEvent type, uint16_t turns_left = kTurnInfinity);
+  OCEEPreemptiveAttack(event::OnCmdEvent type, TurnBased turn = TurnBased{});
   virtual void OnEvent(Unit* unit, CmdAct* act) override;
 };
 
 class OCEEEnhanceBasicAttack : public OnCmdEventEffect {
  public:
-  OCEEEnhanceBasicAttack(event::OnCmdEvent type, int multiplier, int addend, uint16_t turns_left = kTurnInfinity);
+  OCEEEnhanceBasicAttack(event::OnCmdEvent type, CmdBasicAttack::Type ba_type_, AttributeChange change,
+                         TurnBased turn = TurnBased{});
   virtual void OnEvent(Unit* unit, CmdAct* act) override;
+  AttributeChange change() const { return change_; }
 
  private:
-  int multiplier_;
-  int addend_;
+  CmdBasicAttack::Type ba_type_;
+  AttributeChange change_;
+};
+
+class OCEEDoubleAttack : public OnCmdEventEffect {
+ public:
+  OCEEDoubleAttack(event::OnCmdEvent type, TurnBased turn = TurnBased{});
+  virtual void OnEvent(Unit* unit, CmdAct* act) override;
+};
+
+class OCEECriticalAttack : public OnCmdEventEffect {
+ public:
+  OCEECriticalAttack(event::OnCmdEvent type, TurnBased turn = TurnBased{});
+  virtual void OnEvent(Unit* unit, CmdAct* act) override;
+};
+
+class OCEECounterCounterAttack : public OnCmdEventEffect {
+ public:
+  OCEECounterCounterAttack(event::OnCmdEvent type, TurnBased turn = TurnBased{});
+  virtual void OnEvent(Unit* unit, CmdAct* act) override;
+};
+
+class OCEEReflectAttack : public OnCmdEventEffect {
+ public:
+  OCEEReflectAttack(event::OnCmdEvent type, int16_t multiplier, TurnBased turn = TurnBased{});
+  virtual void OnEvent(Unit* unit, CmdAct* act) override;
+  int16_t multiplier() const { return multiplier_; }
+
+ private:
+  int16_t multiplier_;
 };
 
 }  // namespace core

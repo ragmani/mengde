@@ -1,6 +1,8 @@
 #ifndef MENGDE_GUI_APP_MAGIC_LIST_VIEW_H_
 #define MENGDE_GUI_APP_MAGIC_LIST_VIEW_H_
 
+#include <boost/optional.hpp>
+#include "core/id.h"
 #include "gui/uifw/composite_view.h"
 #include "util/common.h"
 
@@ -9,7 +11,7 @@
 namespace mengde {
 namespace core {
 
-class Game;
+class Stage;
 class Unit;
 class UserInterface;
 class MagicList;
@@ -28,10 +30,10 @@ class MagicListView : public CompositeView {
   static const int kTitleHeight = 24;
 
  public:
-  MagicListView(const Rect&, core::Game*, core::UserInterface*, GameView*);
+  MagicListView(const Rect&, core::Stage*, core::UserInterface*, GameView*);
   ~MagicListView();
 
-  void SetData(uint32_t unit_id, uint32_t move_id, shared_ptr<core::MagicList>);
+  void SetData(const core::UnitKey& ukey, const core::MoveKey& mkey, shared_ptr<core::MagicList>);
 
   virtual bool OnMouseButtonEvent(const foundation::MouseButtonEvent&) override;
 
@@ -39,7 +41,7 @@ class MagicListView : public CompositeView {
   void Cleanup();
 
  private:
-  core::Game* game_;
+  core::Stage* stage_;
   core::UserInterface* gi_;
   GameView* gv_;
 

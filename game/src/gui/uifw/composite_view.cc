@@ -6,8 +6,6 @@ namespace uifw {
 
 CompositeView::CompositeView() : View(), transparent_(false) {}
 
-CompositeView::CompositeView(const Rect* rect) : View(rect), transparent_(false) {}
-
 CompositeView::CompositeView(const Rect& rect) : View(rect), transparent_(false) {}
 
 CompositeView::~CompositeView() {
@@ -106,6 +104,14 @@ bool CompositeView::OnMouseWheelEvent(const foundation::MouseWheelEvent& e) {
     if (view->DelegateMouseWheelEvent(e)) return true;
   }
   return true;
+}
+
+bool CompositeView::OnKeyEvent(const foundation::KeyEvent& e) {
+  for (auto itr = children_.rbegin(); itr != children_.rend(); itr++) {
+    View* view = *itr;
+    if (view->DelegateKeyEvent(e)) return true;
+  }
+  return false;
 }
 
 }  // namespace uifw
